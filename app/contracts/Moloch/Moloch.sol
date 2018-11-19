@@ -8,8 +8,6 @@ import "LootToken.sol";
 contract Moloch {
     using SafeMath for uint256;
 
-    event AddMember(address member);
-
     /***************
     GLOBAL CONSTANTS
     ***************/
@@ -23,6 +21,13 @@ contract Moloch {
 
     uint8 constant QUORUM_NUMERATOR = 1;
     uint8 constant QUORUM_DENOMINATOR = 2;
+
+    /***************
+    EVENTS
+    ***************/
+    event AddMember(address member);
+    event SubmitProposal(uint256 index, address indexed applicant, address indexed memberAddress);
+    event ProcessProposal(uint256 index, address indexed applicant, address indexed proposer, uint8 result);
 
     /******************
     INTERNAL ACCOUNTING
@@ -175,13 +180,15 @@ contract Moloch {
             require(token.transferFrom(applicant, this, amount), "Moloch::submitProposal - tribute token transfer failed");
         }
 
+
         pendingProposals = pendingProposals.add(1);
         uint256 startingPeriod = currentPeriod + pendingProposals;
 
         Proposal memory proposal = Proposal(memberAddress, applicant, votingSharesRequested, startingPeriod, 0, 0, false, tributeTokenAddresses, tributeTokenAmounts);
 
-        proposalQueue.push(proposal);
+        SubmitProposal(proposalQueue.push(proposal)-1,applicant,memberAddress);
     }
+
 
     function submitVote(uint256 proposalIndex, uint8 uintVote) public onlyMemberDelegate {
         updatePeriod();
@@ -217,6 +224,8 @@ contract Moloch {
 
         proposal.processed = true;
 
+        uint8 result = 0;
+
         if (proposal.yesVotes.add(proposal.noVotes) >= (totalVotingShares.mul(QUORUM_NUMERATOR)).div(QUORUM_DENOMINATOR) && proposal.yesVotes > proposal.noVotes) {
 
             // if the proposer is the applicant, add to their existing voting shares
@@ -250,12 +259,14 @@ contract Moloch {
                         break;
                     }
                 }
+                result=1;
             // the applicant is a new member, create a new record for them
             } else {
                 // use applicant address as delegateKey by default
                 members[proposal.applicant] = Member(proposal.applicant, proposal.votingSharesRequested, true);
                 emit AddMember(proposal.applicant);
                 memberAddressByDelegateKey[proposal.applicant] = proposal.applicant;
+                result=2;
             }
 
             // mint new voting shares and loot tokens
@@ -272,12 +283,15 @@ contract Moloch {
                 ERC20 token = ERC20(proposal.tributeTokenAddresses[k]);
                 require(token.transfer(proposal.applicant, proposal.tributeTokenAmounts[k]));
             }
+            result=3;
         }
 
         proposal.proposer.transfer(proposalDeposit);
+        emit ProcessProposal(proposalIndex, proposal.applicant, proposal.proposer,result);
     }
 
-    function collectLootTokens(address treasury, uint256 lootAmount) public onlyMember {
+
+    function collectLootTokens(address treasury, uint256 lootAmount,uint8 result) public onlyMember {
         updatePeriod();
 
         Member storage member = members[msg.sender];
