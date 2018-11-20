@@ -109,6 +109,7 @@ class App extends Component {
              votingPeriodLength: await contracts.Moloch.votingPeriodLength().call(),
              gracePeriodLength: await contracts.Moloch.gracePeriodLength().call(),
              periodDuration: await contracts.Moloch.periodDuration().call(),
+             applicant: await contracts.Moloch.deployer().call(),
            },async ()=>{
              console.log("Contracts Are Ready:",this.state.contracts)
 

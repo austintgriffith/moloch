@@ -89,7 +89,7 @@ contract Moloch {
     /********
     FUNCTIONS
     ********/
-
+    address public deployer;//used for simple debugging
     constructor(
         address guildBankAddress,
         address[] foundersAddresses,
@@ -103,6 +103,8 @@ contract Moloch {
     {
         lootToken = new LootToken();
         guildBank = GuildBank(guildBankAddress);
+
+        deployer=msg.sender;
 
         periodDuration = _periodDuration;
         votingPeriodLength = _votingPeriodLength;
@@ -198,11 +200,11 @@ contract Moloch {
 
         Proposal storage proposal = proposalQueue[proposalIndex];
         Vote vote = Vote(uintVote);
-        require(proposal.startingPeriod > 0, "Moloch::submitVote - proposal does not exist");
-        require(currentPeriod >= proposal.startingPeriod, "Moloch::submitVote - voting period has not started");
-        require(currentPeriod.sub(proposal.startingPeriod) < votingPeriodLength, "Moloch::submitVote - proposal voting period has expired");
-        require(proposal.votesByMember[memberAddress] == Vote.Null, "Moloch::submitVote - member has already voted on this proposal");
-        require(vote == Vote.Yes || vote == Vote.No, "Moloch::submitVote - vote must be either Yes or No");
+        //require(proposal.startingPeriod > 0, "Moloch::submitVote - proposal does not exist");
+      //  require(currentPeriod >= proposal.startingPeriod, "Moloch::submitVote - voting period has not started");
+      //  require(currentPeriod.sub(proposal.startingPeriod) < votingPeriodLength, "Moloch::submitVote - proposal voting period has expired");
+      //  require(proposal.votesByMember[memberAddress] == Vote.Null, "Moloch::submitVote - member has already voted on this proposal");
+      //  require(vote == Vote.Yes || vote == Vote.No, "Moloch::submitVote - vote must be either Yes or No");
         proposal.votesByMember[memberAddress] = vote;
 
         Member storage member = members[memberAddress];
@@ -221,9 +223,9 @@ contract Moloch {
         updatePeriod();
 
         Proposal storage proposal = proposalQueue[proposalIndex];
-        require(proposal.startingPeriod > 0, "Moloch::processProposal - proposal does not exist");
-        require(currentPeriod.sub(proposal.startingPeriod) > votingPeriodLength.add(gracePeriodLength), "Moloch::processProposal - proposal is not ready to be processed");
-        require(proposal.processed == false, "Moloch::processProposal - proposal has already been processed");
+        //require(proposal.startingPeriod > 0, "Moloch::processProposal - proposal does not exist");
+        //require(currentPeriod.sub(proposal.startingPeriod) > votingPeriodLength.add(gracePeriodLength), "Moloch::processProposal - proposal is not ready to be processed");
+        //require(proposal.processed == false, "Moloch::processProposal - proposal has already been processed");
 
         proposal.processed = true;
 
@@ -246,16 +248,18 @@ contract Moloch {
                 // loop over their active proposal votes and add the new voting shares to any YES or NO votes
                 for (uint256 i = currentProposalIndex; i > oldestActiveProposal; i--) {
                     if (isActiveProposal(i)) {
-                        Proposal storage activeProposal = proposalQueue[i];
-                        Vote vote = activeProposal.votesByMember[proposal.applicant];
+                        if(i!=proposalIndex) {//don't update the votes for the current propsal even if we already counted the votes (because it could possibly look wrong looking back at the count)
+                          Proposal storage activeProposal = proposalQueue[i];
+                          Vote vote = activeProposal.votesByMember[proposal.applicant];
 
-                        if (vote == Vote.Null) {
-                            // member didn't vote on this proposal, skip to the next one
-                            continue;
-                        } else if (vote == Vote.Yes) {
-                            activeProposal.yesVotes = activeProposal.yesVotes.add(proposal.votingSharesRequested);
-                        } else {
-                            activeProposal.noVotes = activeProposal.noVotes.add(proposal.votingSharesRequested);
+                          if (vote == Vote.Null) {
+                              // member didn't vote on this proposal, skip to the next one
+                              continue;
+                          } else if (vote == Vote.Yes) {
+                              activeProposal.yesVotes = activeProposal.yesVotes.add(proposal.votingSharesRequested);
+                          } else {
+                              activeProposal.noVotes = activeProposal.noVotes.add(proposal.votingSharesRequested);
+                          }
                         }
                     } else {
                         // reached inactive proposal, exit the loop
@@ -278,7 +282,9 @@ contract Moloch {
 
             // deposit all tribute tokens to guild bank
             for (uint256 j; j < proposal.tributeTokenAddresses.length; j++) {
-                require(guildBank.depositTributeTokens(this, proposal.tributeTokenAddresses[j], proposal.tributeTokenAmounts[j]));
+              ERC20 tributeToken = ERC20(proposal.tributeTokenAddresses[j]);
+              tributeToken.approve(address(guildBank),proposal.tributeTokenAmounts[j]);
+              require(guildBank.depositTributeTokens(this, proposal.tributeTokenAddresses[j], proposal.tributeTokenAmounts[j]));
             }
         } else {
             // return all tokens
@@ -292,6 +298,7 @@ contract Moloch {
         proposal.proposer.transfer(proposalDeposit);
         emit ProcessProposal(proposalIndex, proposal.applicant, proposal.proposer,result);
     }
+
 
 
     function collectLootTokens(address treasury, uint256 lootAmount,uint8 result) public onlyMember {

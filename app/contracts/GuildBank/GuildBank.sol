@@ -32,8 +32,10 @@ contract GuildBank is Ownable {
             tokenAddresses.push(tokenAddress);
         }
         ERC20 token = ERC20(tokenAddress);
+        //TODO it might be better to check the balance before and after and return true if it changed correctly
         return (token.transferFrom(sender, this, tokenAmount));
     }
+
 
     function redeemLootTokens(
         address receiver,

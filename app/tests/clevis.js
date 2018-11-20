@@ -143,9 +143,9 @@ module.exports = {
     describe('#transfer() ', function() {
       it('should give metamask account some ether or tokens to test', async function() {
         this.timeout(600000)
-        let result = await clevis("sendTo","3","0","0x2a906694D15Df38F59e76ED3a5735f8AAbccE9cb")///<<<-------- change this to your metamask accounts
+        let result = await clevis("sendTo","1","0","0x2a906694D15Df38F59e76ED3a5735f8AAbccE9cb")///<<<-------- change this to your metamask accounts
         printTxResult(result)
-        result = await clevis("sendTo","5","0","0x9319bbb4e2652411be15bb74f339b7f6218b2508")///<<<-------- change this to your metamask accounts
+        result = await clevis("sendTo","1","0","0x9319bbb4e2652411be15bb74f339b7f6218b2508")///<<<-------- change this to your metamask accounts
         printTxResult(result)
 
         result = await clevis("contract","mint","SomeCoin","0","0x2a906694D15Df38F59e76ED3a5735f8AAbccE9cb",100)///<<<-------- change this to your metamask accounts
@@ -155,6 +155,7 @@ module.exports = {
         //here is an example of running a funtion from within this object:
         //module.exports.mintTo("Greens",0,"0x2a906694d15df38f59e76ed3a5735f8aabcce9cb",20)
         //view more examples here: https://github.com/austintgriffith/galleass/blob/master/tests/galleass.js
+
       });
     });
   },
@@ -162,10 +163,31 @@ module.exports = {
 
   ////----------------------------------------------------------------------------///////////////////
 
+  transferGuildBankOwnershipToMoloch:(account)=>{
+    describe('#transferGuildBankOwnershipToMoloch() ', function() {
+      it('should transferGuildBankOwnershipToMoloch', async function() {
+        this.timeout(600000)
+        //clevis contract transferOwnership GuildBank
+        let molochAddress = fs.readFileSync(clevisConfig.CONTRACTS_FOLDER +"/Moloch/Moloch.address").toString().trim()
+        let result = await clevis("contract","transferOwnership","GuildBank",account,molochAddress)
+        printTxResult(result)
 
-  ////    ADD YOUR TESTS HERE <<<<<<<<--------------------------------
-
-
+      });
+    });
+  },
+  mintSomeCoinAndApprove:(account,amount)=>{
+    describe('#mintSomeCoinAndApprove() ', function() {
+      it('should mintSomeCoinAndApprove', async function() {
+        this.timeout(600000)
+        let accounts = await clevis("accounts")
+        let result = await clevis("contract","mint","SomeCoin",account,accounts[account],amount)
+        printTxResult(result)
+        let molochAddress = fs.readFileSync(clevisConfig.CONTRACTS_FOLDER +"/Moloch/Moloch.address").toString().trim()
+        result = await clevis("contract","approve","SomeCoin",account,molochAddress,amount)
+        printTxResult(result)
+      });
+    });
+  },
   ////----------------------------------------------------------------------------///////////////////
 
 
