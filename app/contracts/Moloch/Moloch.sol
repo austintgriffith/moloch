@@ -28,6 +28,7 @@ contract Moloch {
     event AddMember(address member);
     event SubmitProposal(uint256 index, address indexed applicant, address indexed memberAddress);
     event ProcessProposal(uint256 index, address indexed applicant, address indexed proposer, uint8 result);
+    event SubmitVote(address sender, address indexed memberAddress, uint256 proposalIndex, uint8 uintVote);
 
     /******************
     INTERNAL ACCOUNTING
@@ -208,10 +209,12 @@ contract Moloch {
         member.votesByProposal[proposalIndex] = vote;
 
         if (vote == Vote.Yes) {
-            proposal.yesVotes.add(member.votingShares);
+            proposal.yesVotes = proposal.yesVotes.add(member.votingShares);
         } else if (vote == Vote.No) {
-            proposal.noVotes.add(member.votingShares);
+            proposal.noVotes = proposal.noVotes.add(member.votingShares);
         }
+
+        emit SubmitVote(msg.sender, memberAddress, proposalIndex, uintVote);
     }
 
     function processProposal(uint256 proposalIndex) public {

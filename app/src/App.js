@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import './App.css';
-import { Metamask, Gas, ContractLoader, Transactions, Events, Scaler, Blockie, Address, Button } from "dapparatus"
+import { Metamask, Gas, ContractLoader, Transactions, Events, Blockie, Address, Button } from "dapparatus"
 import Web3 from 'web3';
 
 const dividerSpan = {
@@ -38,6 +38,7 @@ class App extends Component {
       let currentPeriodInformation = await this.state.contracts.Moloch.periods(currentPeriod).call()
       let pendingProposals = await this.state.contracts.Moloch.pendingProposals().call()
       let totalVotingShares = await this.state.contracts.Moloch.totalVotingShares().call()
+      let memberInformation = await this.state.contracts.Moloch.members(this.state.account).call()
       let tokenApprovals = this.state.tokenApprovals
       if(this.state.applicant && this.state.tributeTokenAddresses){
         let tokenContracts = this.state.tokenContracts
@@ -72,7 +73,7 @@ class App extends Component {
         this.setState({proposals})
       }
 
-      this.setState({someCoinBalance,currentPeriod,currentPeriodInformation,pendingProposals,totalVotingShares})
+      this.setState({memberInformation,someCoinBalance,currentPeriod,currentPeriodInformation,pendingProposals,totalVotingShares})
     }
   }
   render() {
@@ -138,7 +139,7 @@ class App extends Component {
       )
 
       if(contracts){
-
+        console.log("memberInformation",this.state.memberInformation)
         let approvals = []
         if(this.state.tributeTokenAmounts&&this.state.tributeTokenAddresses){
           let tokenAmounts = this.state.tributeTokenAmounts.split(",")
@@ -174,15 +175,51 @@ class App extends Component {
           console.log(proposal)
 
           let proposalButton = ""
+          let voteButtons = ""
+          let votingPeriodAt = ""
+          let readyToProcessAt = ""
           if(!proposal.processed){
+            let color = "yellow"
+            console.log("this.state.currentPeriod",this.state.currentPeriod)
+            console.log("proposal.startingPeriod",proposal.startingPeriod)
+            console.log("this.state.votingPeriodLength",this.state.votingPeriodLength)
+            console.log("this.state.gracePeriodLength",this.state.gracePeriodLength)
+            votingPeriodAt = parseInt(proposal.startingPeriod)+parseInt(this.state.votingPeriodLength)
+            readyToProcessAt = votingPeriodAt+parseInt(this.state.gracePeriodLength)
+            console.log("readyToProcessAt",readyToProcessAt)
+            if(this.state.currentPeriod>readyToProcessAt){
+              color = "green"
+            }
             proposalButton =(
-              <Button color="green" onClick={()=>{
-                  tx(contracts.Moloch.processProposal(p),1500000,0,0,(receipt)=>{
+              <Button color={color} onClick={()=>{
+                  tx(contracts.Moloch.processProposal(p),2500000,0,0,(receipt)=>{
                     console.log("receipt",receipt)
                   })
                 }}>
                 Process
               </Button>
+            )
+            let voteColor = "blue"
+            if(this.state.currentPeriod>votingPeriodAt){
+              voteColor = "red"
+            }
+            voteButtons = (
+              <span>
+                <Button color={voteColor} onClick={()=>{
+                    tx(contracts.Moloch.submitVote(p,1),1500000,0,0,(receipt)=>{
+                      console.log("receipt",receipt)
+                    })
+                  }}>
+                  YES
+                </Button>
+                <Button color={voteColor} onClick={()=>{
+                    tx(contracts.Moloch.submitVote(p,2),1500000,0,0,(receipt)=>{
+                      console.log("receipt",receipt)
+                    })
+                  }}>
+                  NO
+                </Button>
+              </span>
             )
           }
 
@@ -213,17 +250,41 @@ class App extends Component {
                 shares:{proposal.votingSharesRequested}
               </span>
               <span style={dividerSpan}>
-                startingPeriod:{proposal.startingPeriod}
+                startingPeriod:{proposal.startingPeriod}-({votingPeriodAt})-({readyToProcessAt})
               </span>
-
+              {voteButtons}
               {proposalButton}
+            </div>
+          )
+        }
+
+        let updatePeriodColor = "orange"
+        let periodEndsIn = (this.state.currentPeriodInformation?Math.round(this.state.currentPeriodInformation.endTime-Date.now()/1000):0)
+        let periodStartedAt = (this.state.currentPeriodInformation?Math.round(Date.now()/1000-this.state.currentPeriodInformation.startTime):0)
+
+        if(periodEndsIn<=0){
+          updatePeriodColor = "green"
+        }
+
+        let memberInformation = "loading member information..."
+        if(this.state.memberInformation){
+          memberInformation = (
+            <div>
+              {" active:"}{this.state.memberInformation.isActive?"true":"false"}
+              {" votingShares:"}{this.state.memberInformation.votingShares}
+              {" delegateKey:"}<Blockie
+                address={this.state.memberInformation.delegateKey}
+                config={{size:3}}
+              />
             </div>
           )
         }
 
         contractsDisplay.push(
           <div key="UI" style={{padding:30}}>
-            <h1>👹 Moloch Lurks</h1>
+            <h1>{"👹 Moloch Lurks"}
+              <span style={{fontSize:16}}> ({this.state.web3.utils.fromWei(this.state.proposalDeposit)}ETH {this.state.periodDuration}s {this.state.votingPeriodLength} {this.state.gracePeriodLength})</span>
+            </h1>
             <div>
               <Address
                 {...this.state}
@@ -236,15 +297,19 @@ class App extends Component {
               <span style={{padding:5}}>totalVotingShares:{this.state.totalVotingShares}</span>
             </div>
             <div style={{borderBottom:"1px solid #444444",margin:10}}>
-              <Button color="orange" onClick={()=>{
-                  tx(contracts.Moloch.updatePeriod(),1500000,0,0,(receipt)=>{
+              <Button color={updatePeriodColor} onClick={()=>{
+                  console.log("periodStartedAt",periodStartedAt)
+                  console.log("this.state.periodDuration",this.state.periodDuration)
+                  let gasNeeded = Math.round(20000 + 50000 * (parseInt(periodStartedAt)/parseInt(this.state.periodDuration)))
+                  console.log("gasNeeded",gasNeeded)
+                  tx(contracts.Moloch.updatePeriod(),gasNeeded,0,0,(receipt)=>{
                     console.log("receipt",receipt)
                   })
                 }}>
                 updatePeriod()
               </Button>
-              <span style={{padding:5}}>period start:{this.state.currentPeriodInformation?Math.round(Date.now()/1000-this.state.currentPeriodInformation.startTime)+"s":0}</span>
-              <span style={{padding:5}}>period end:{this.state.currentPeriodInformation?Math.round(this.state.currentPeriodInformation.endTime-Date.now()/1000)+"s":0}</span>
+              <span style={{padding:5}}>period start:{periodStartedAt+"s"}</span>
+              <span style={{padding:5}}>period end:{periodEndsIn+"s"}</span>
             </div>
             <div style={{margin:20}}>
               <Address
@@ -255,6 +320,7 @@ class App extends Component {
                address={contracts.SomeCoin._address}
                config={{size:3}}
               />Coins)
+              {memberInformation}
             </div>
             <div style={{border:"1px solid #444444",margin:10,padding:10}}>
               <h3>Proposals:</h3>
@@ -299,7 +365,7 @@ class App extends Component {
                 </div>
                 (Deposit {this.state.web3.utils.fromWei(this.state.proposalDeposit)} ETH)
               <Button size="2" color="green" onClick={()=>{
-                  let maxGasLimit = 300000
+                  let maxGasLimit = 600000
                   let txData = 0
                   let value = this.state.proposalDeposit
                   tx(contracts.Moloch.submitProposal(
@@ -344,9 +410,16 @@ class App extends Component {
                 this.setState({processProposalEvents:allEvents})
               }}
             />
-
-
-
+            <Events
+              config={{hide:false}}
+              contract={contracts.Moloch}
+              eventName={"SubmitVote"}
+              block={block}
+              onUpdate={(eventData,allEvents)=>{
+                console.log("EVENT DATA:",eventData)
+                this.setState({processProposalEvents:allEvents})
+              }}
+            />
           </div>
         )
       }
