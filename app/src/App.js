@@ -21,7 +21,9 @@ class App extends Component {
       tributeTokenAmounts:"10",
       votingSharesRequested:"100",
       tokenApprovals: {},
+      tokenBalances: {},
       proposals: [],
+      members: [],
     }
     setTimeout(this.poll.bind(this),500)
     setInterval(this.poll.bind(this),1500)
@@ -33,13 +35,13 @@ class App extends Component {
   }
   async poll() {
     if(this.state.contracts){
-      let someCoinBalance = await this.state.contracts.SomeCoin.balanceOf(this.state.account).call()
       let currentPeriod = await this.state.contracts.Moloch.currentPeriod().call()
       let currentPeriodInformation = await this.state.contracts.Moloch.periods(currentPeriod).call()
       let pendingProposals = await this.state.contracts.Moloch.pendingProposals().call()
       let totalVotingShares = await this.state.contracts.Moloch.totalVotingShares().call()
       let memberInformation = await this.state.contracts.Moloch.members(this.state.account).call()
       let tokenApprovals = this.state.tokenApprovals
+      let tokenBalances = this.state.tokenBalances
       if(this.state.applicant && this.state.tributeTokenAddresses){
         let tokenContracts = this.state.tokenContracts
         let tokenContractsChanged = false
@@ -55,6 +57,7 @@ class App extends Component {
               tokenContracts[tokenAddresses[a]] = this.state.customLoader("SomeCoin",tokenAddresses[a])
             }
             tokenApprovals[tokenAddresses[a]] = await tokenContracts[tokenAddresses[a]].allowance(this.state.applicant,this.state.contracts.Moloch._address).call()
+            tokenBalances[tokenAddresses[a]] = await tokenContracts[tokenAddresses[a]].balanceOf(this.state.applicant).call()
         }
         if(tokenContractsChanged){
           console.log("tokenContracts CHANGE:",tokenContracts)
@@ -72,8 +75,18 @@ class App extends Component {
         }
         this.setState({proposals})
       }
+      if(this.state.addMemberEvents){
+        let {members} = this.state
+        for(let e in this.state.addMemberEvents){
+          let member = this.state.addMemberEvents[e]
+          let memberInformation = await this.state.contracts.Moloch.members(member.member).call()
+          memberInformation.someCoinBalance = await this.state.contracts.SomeCoin.balanceOf(member.member).call()
+          members[member.member] = memberInformation
+        }
+        this.setState({members})
+      }
 
-      this.setState({memberInformation,someCoinBalance,currentPeriod,currentPeriodInformation,pendingProposals,totalVotingShares})
+      this.setState({memberInformation,currentPeriod,currentPeriodInformation,pendingProposals,totalVotingShares})
     }
   }
   render() {
@@ -164,7 +177,7 @@ class App extends Component {
                  address={tokenAddresses[a]}
                  config={{size:3}}
                 />: {this.state.tokenApprovals[tokenAddresses[a]]?this.state.tokenApprovals[tokenAddresses[a]]:0}
-
+                ({this.state.tokenBalances[tokenAddresses[a]]?this.state.tokenBalances[tokenAddresses[a]]:0})
               </div>
             )
           }
@@ -281,6 +294,35 @@ class App extends Component {
           )
         }
 
+        let members=[]
+
+        for(let m in this.state.members){
+          let member = this.state.members[m]
+          members.push(
+            <div key={m}>
+              <div style={{marginTop:20}}>
+                <Address
+                  {...this.state}
+                  address={m}
+                />
+
+              </div>
+              <div style={{borderBottom:"1px solid #555555"}}>
+                {" active:"}{member.isActive?"true":"false"}
+                {" votingShares:"}{member.votingShares}
+                {" delegateKey:"}<Blockie
+                  address={member.delegateKey}
+                  config={{size:3}}
+                />
+                ({member.someCoinBalance} <Blockie
+                 address={contracts.SomeCoin._address}
+                 config={{size:3}}
+                />Coins)
+              </div>
+            </div>
+          )
+        }
+
         contractsDisplay.push(
           <div key="UI" style={{padding:30}}>
             <h1>{"👹 Moloch Lurks"}
@@ -312,16 +354,10 @@ class App extends Component {
               <span style={{padding:5}}>period start:{periodStartedAt+"s"}</span>
               <span style={{padding:5}}>period end:{periodEndsIn+"s"}</span>
             </div>
-            <div style={{margin:20}}>
-              <Address
-                {...this.state}
-                address={this.state.account}
-              />
-              ({this.state.someCoinBalance} <Blockie
-               address={contracts.SomeCoin._address}
-               config={{size:3}}
-              />Coins)
-              {memberInformation}
+
+            <div style={{border:"1px solid #444444",margin:10,padding:10}}>
+              <h3>Members:</h3>
+              {members}
             </div>
             <div style={{border:"1px solid #444444",margin:10,padding:10}}>
               <h3>Proposals:</h3>
