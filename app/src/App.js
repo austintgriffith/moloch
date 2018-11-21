@@ -22,6 +22,7 @@ class App extends Component {
       votingSharesRequested:"100",
       tokenApprovals: {},
       tokenBalances: {},
+      guildBankTokenBalances: {},
       proposals: [],
       members: [],
     }
@@ -47,6 +48,11 @@ class App extends Component {
         let lootTokenContract = this.state.customLoader("LootToken",lootTokenAddress)//new this.state.web3.eth.Contract(require("./contracts/BouncerProxy.abi.js"),this.state.address)
         this.setState({lootTokenContract})
       }
+      let guildBankAddress = await this.state.contracts.Moloch.guildBank().call()
+      if(!this.state.guildBankContract){
+        let guildBankContract = this.state.customLoader("GuildBank",guildBankAddress)//new this.state.web3.eth.Contract(require("./contracts/BouncerProxy.abi.js"),this.state.address)
+        this.setState({guildBankContract})
+      }
 
       if(this.state.applicant && this.state.tributeTokenAddresses){
         let tokenContracts = this.state.tokenContracts
@@ -62,8 +68,10 @@ class App extends Component {
               tokenContractsChanged=true
               tokenContracts[tokenAddresses[a]] = this.state.customLoader("SomeCoin",tokenAddresses[a])
             }
-            tokenApprovals[tokenAddresses[a]] = await tokenContracts[tokenAddresses[a]].allowance(this.state.applicant,this.state.contracts.Moloch._address).call()
-            tokenBalances[tokenAddresses[a]] = await tokenContracts[tokenAddresses[a]].balanceOf(this.state.applicant).call()
+            try{
+              tokenApprovals[tokenAddresses[a]] = await tokenContracts[tokenAddresses[a]].allowance(this.state.applicant,this.state.contracts.Moloch._address).call()
+              tokenBalances[tokenAddresses[a]] = await tokenContracts[tokenAddresses[a]].balanceOf(this.state.applicant).call()
+            }catch(e){console.log(e)}
         }
         if(tokenContractsChanged){
           console.log("tokenContracts CHANGE:",tokenContracts)
@@ -76,7 +84,16 @@ class App extends Component {
           let event = this.state.submitProposalEvents[e]
           //console.log("Loading proposal with index",event.index)
           let proposal = await this.state.contracts.Moloch.proposalQueue(event.index).call()
-          //console.log("submitProposalEvent",proposal)//,proposal)
+          let proposalTokenCount = await this.state.contracts.Moloch.getProposalTokenLength(event.index).call()
+          proposal.tokens = []
+          for(let t=0;t<proposalTokenCount;t++){
+            proposal.tokens.push(
+              {
+                address: await this.state.contracts.Moloch.getProposalTokenAddress(event.index,t).call(),
+                amount: await this.state.contracts.Moloch.getProposalTokenAmount(event.index,t).call(),
+              }
+            )
+          }
           proposals[event.index] = proposal
         }
         this.setState({proposals})
@@ -93,6 +110,29 @@ class App extends Component {
           members[member.member] = memberInformation
         }
         this.setState({members})
+      }
+
+      if(this.state.guildBankContract){
+        let guildBankTokenAddressCount = await this.state.guildBankContract.getTokenAddressCount().call()
+        let guildBankTokens = []
+        let guildBankTokenBalances = this.state.guildBankTokenBalances
+        let tokenContracts = this.state.tokenContracts
+        let tokenContractsChanged = false
+        for(let t = 0; t<guildBankTokenAddressCount;t++){
+
+            let thisTokenAddress = await this.state.guildBankContract.tokenAddresses(t).call()
+            guildBankTokens.push(thisTokenAddress)
+            if(!tokenContracts[thisTokenAddress]){
+              tokenContractsChanged=true
+              tokenContracts[thisTokenAddress] = this.state.customLoader("SomeCoin",thisTokenAddress)
+            }
+            guildBankTokenBalances[thisTokenAddress] = await tokenContracts[thisTokenAddress].balanceOf(this.state.guildBankContract._address).call()
+        }
+        this.setState({guildBankTokenAddressCount,guildBankTokens,guildBankTokenBalances})
+        if(tokenContractsChanged){
+          console.log("tokenContracts CHANGE:",tokenContracts)
+          this.setState({tokenContracts})
+        }
       }
 
       this.setState({memberInformation,currentPeriod,currentPeriodInformation,pendingProposals,totalVotingShares})
@@ -261,6 +301,18 @@ class App extends Component {
             }
           }
 
+          let proposalTokens = []
+          for(let t in proposal.tokens){
+            proposalTokens.push(
+              <span style={{marginLeft:10}}>
+                <Blockie
+                 address={proposal.tokens[t].address}
+                 config={{size:3}}
+                />:{proposal.tokens[t].amount}
+              </span>
+            )
+          }
+
           proposals.push(
             <div key={p}>
               <span style={dividerSpan}>
@@ -283,21 +335,25 @@ class App extends Component {
                 shares:{proposal.votingSharesRequested}
               </span>)
 
-              <span style={dividerSpan}>
-                [{proposal.startingPeriod}/{votingPeriodAt}/{readyToProcessAt}]
-              </span>
+              [{proposalTokens}]
 
-              <span style={dividerSpan}>
-                no:{proposal.noVotes}
-              </span>
-              <span style={dividerSpan}>
-                yes:{proposal.yesVotes}
-              </span>
+              <div>
+                <span style={dividerSpan}>
+                  [{proposal.startingPeriod}/{votingPeriodAt}/{readyToProcessAt}]
+                </span>
 
-              ({currentProposalStatus})
+                <span style={dividerSpan}>
+                  no:{proposal.noVotes}
+                </span>
+                <span style={dividerSpan}>
+                  yes:{proposal.yesVotes}
+                </span>
 
-              {voteButtons}
-              {proposalButton}
+                ({currentProposalStatus})
+
+                {voteButtons}
+                {proposalButton}
+              </div>
             </div>
           )
         }
@@ -333,8 +389,9 @@ class App extends Component {
           if(m.toLowerCase()==this.state.account.toLowerCase()){
             memberControls = (
               <div>
-                RageQuit: <input
-                  style={{verticalAlign:"middle",width:400,margin:6,maxHeight:20,padding:5,border:'2px solid #ccc',borderRadius:5}}
+                <div>
+                <input
+                  style={{verticalAlign:"middle",width:100,margin:6,maxHeight:20,padding:5,border:'2px solid #ccc',borderRadius:5}}
                   type="text" name="collectLootTokens" value={this.state.collectLootTokens} onChange={this.handleInput.bind(this)}
                 />
                 <Button color={"orange"} onClick={()=>{
@@ -345,6 +402,28 @@ class App extends Component {
                   }}>
                   collectLootTokens
                 </Button>
+                </div>
+                <div>
+                  <input
+                    style={{verticalAlign:"middle",width:100,margin:6,maxHeight:20,padding:5,border:'2px solid #ccc',borderRadius:5}}
+                    type="text" name="redeemLootTokens" value={this.state.redeemLootTokens} onChange={this.handleInput.bind(this)}
+                  />
+                  <Button color={"blue"} onClick={()=>{
+                      tx(this.state.lootTokenContract.approve(this.state.guildBankContract._address,this.state.redeemLootTokens),2000000,0,0,(receipt)=>{
+                        console.log("receipt",receipt)
+                      })
+                    }}>
+                    approve
+                  </Button>
+                  <Button color={"orange"} onClick={()=>{
+                      tx(this.state.guildBankContract.redeemLootTokens(this.state.account,this.state.redeemLootTokens),2000000,0,0,(receipt)=>{
+                        console.log("receipt",receipt)
+                        this.setState({redeemLootTokens:""})
+                      })
+                    }}>
+                    redeemLootTokens
+                  </Button>
+                </div>
               </div>
             )
           }
@@ -372,6 +451,50 @@ class App extends Component {
               </div>
             </div>
           )
+        }
+
+        let guildBank = ""
+        let guildBankEventParser = ""
+        if(this.state.guildBankContract){
+          guildBankEventParser = (
+            <Events
+              config={{hide:false}}
+              contract={this.state.guildBankContract}
+              eventName={"DepositTributeTokens"}
+              block={block}
+              onUpdate={(eventData,allEvents)=>{
+                console.log("DepositTributeTokens EVENT DATA:",eventData)
+                this.setState({DepositTributeTokenEvents:allEvents})
+              }}
+            />
+          )
+
+        //  guildBankTokenAddressCount
+          let guildBankTokens = []
+          for(let t in this.state.guildBankTokens){
+            let guildBankTokenAddress = this.state.guildBankTokens[t]
+            let guildBankTokenBalance = this.state.guildBankTokenBalances[guildBankTokenAddress]
+            guildBankTokens.push(
+              <div>
+                <Blockie
+                  config={{size:3}}
+                  address={guildBankTokenAddress}
+                />{guildBankTokenBalance}
+              </div>
+            )
+          }
+
+          guildBank = (
+            <div>
+              <Address
+                {...this.state}
+                address={this.state.guildBankContract._address}
+              />
+              {guildBankTokens}
+            </div>
+          )
+
+
         }
 
         contractsDisplay.push(
@@ -404,6 +527,11 @@ class App extends Component {
               </Button>
               <span style={{padding:5}}>period start:{periodStartedAt+"s"}</span>
               <span style={{padding:5}}>period end:{periodEndsIn+"s"}</span>
+            </div>
+
+            <div style={{border:"1px solid #444444",margin:10,padding:10}}>
+              <h3>Guild Bank:</h3>
+              {guildBank}
             </div>
 
             <div style={{border:"1px solid #444444",margin:10,padding:10}}>
@@ -508,6 +636,7 @@ class App extends Component {
                 this.setState({processProposalEvents:allEvents})
               }}
             />
+            {guildBankEventParser}
           </div>
         )
       }

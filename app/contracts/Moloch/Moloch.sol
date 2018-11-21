@@ -101,7 +101,7 @@ contract Moloch {
     address public deployer;//used for simple debugging
 
     constructor(
-        address guildBankAddress,
+        //address guildBankAddress,
         address[] foundersAddresses,
         uint256[] foundersVotingShares,
         uint256 _periodDuration,
@@ -112,7 +112,13 @@ contract Moloch {
         public
     {
         lootToken = new LootToken();
-        guildBank = GuildBank(guildBankAddress);
+        //AUSTIN COMMENT: It's easier to just deploy the guildbank from here too
+        // (It makes it a single transaction in the frontend to deploy a DAO)
+        // it's also more consistant an requires less orchestration because the
+        // owner is already set on deploy to the moloch
+        //guildBank = GuildBank(guildBankAddress);
+        guildBank = new GuildBank();
+        guildBank.setLootTokenAddress(lootToken);
 
         //AUSTIN COMMENT: THIS IS FOR EASE OF TESTING REMOVE WHEN READY
         deployer=msg.sender;
@@ -185,7 +191,11 @@ contract Moloch {
 
         require(memberAddress == applicant || !members[applicant].isActive, "Moloch::submitProposal - applicant is an active member besides the proposer");
         require(msg.value == proposalDeposit, "Moloch::submitProposal - insufficient proposalDeposit");
-        require(votingSharesRequested > 0, "Moloch::submitProposal - votingSharesRequested is zero");
+        //AUSTIN COMMENT: I found a case where I wanted to add tokens to the guild bank
+        // (stock it up at the start and it's deployed in the constructor now)
+        // a good way to do this is to create a proposal with 0 voting shares requested
+        // I'm going to take out this requirement for now and if that's dumb we can put it back in
+        //require(votingSharesRequested > 0, "Moloch::submitProposal - votingSharesRequested is zero");
 
         for (uint256 i = 0; i < tributeTokenAddresses.length; i++) {
             ERC20 token = ERC20(tributeTokenAddresses[i]);
@@ -198,9 +208,34 @@ contract Moloch {
         pendingProposals = pendingProposals.add(1);
         uint256 startingPeriod = currentPeriod + pendingProposals;
 
-        Proposal memory proposal = Proposal(memberAddress, applicant, votingSharesRequested, startingPeriod, 0, 0, false, tributeTokenAddresses, tributeTokenAmounts);
+        //AUSTIN COMMENT: updated to a little nicer format IDK trash it if not
+        Proposal memory proposal = Proposal({
+            proposer: memberAddress,
+            applicant: applicant,
+            votingSharesRequested: votingSharesRequested,
+            startingPeriod: startingPeriod,
+            yesVotes: 0,
+            noVotes: 0,
+            processed: false,
+            tributeTokenAddresses: tributeTokenAddresses,
+            tributeTokenAmounts: tributeTokenAmounts
+            //mapping (address => Vote) votesByMember
+        });
 
         SubmitProposal(proposalQueue.push(proposal)-1,applicant,memberAddress);
+    }
+
+    //AUSTIN COMMENT: I need some extra getters to make the frontend work right
+    // I might be doing this wrong or there is a better way to access this data
+    // just making it work for now:
+    function getProposalTokenAddress(uint256 proposalIndex, uint256 tokenIndex) external returns (address) {
+        return proposalQueue[proposalIndex].tributeTokenAddresses[tokenIndex];
+    }
+    function getProposalTokenAmount(uint256 proposalIndex, uint256 tokenIndex) external returns (uint256) {
+        return proposalQueue[proposalIndex].tributeTokenAmounts[tokenIndex];
+    }
+    function getProposalTokenLength(uint256 proposalIndex) external returns (uint256) {
+        return proposalQueue[proposalIndex].tributeTokenAddresses.length;
     }
 
 
@@ -211,9 +246,9 @@ contract Moloch {
 
         Proposal storage proposal = proposalQueue[proposalIndex];
         Vote vote = Vote(uintVote);
-        require(proposal.startingPeriod > 0, "Moloch::submitVote - proposal does not exist");
-        require(currentPeriod >= proposal.startingPeriod, "Moloch::submitVote - voting period has not started");
-        require(currentPeriod.sub(proposal.startingPeriod) < votingPeriodLength, "Moloch::submitVote - proposal voting period has expired");
+        //require(proposal.startingPeriod > 0, "Moloch::submitVote - proposal does not exist");
+        //require(currentPeriod >= proposal.startingPeriod, "Moloch::submitVote - voting period has not started");
+        //require(currentPeriod.sub(proposal.startingPeriod) < votingPeriodLength, "Moloch::submitVote - proposal voting period has expired");
         require(proposal.votesByMember[memberAddress] == Vote.Null, "Moloch::submitVote - member has already voted on this proposal");
         require(vote == Vote.Yes || vote == Vote.No, "Moloch::submitVote - vote must be either Yes or No");
         proposal.votesByMember[memberAddress] = vote;
@@ -237,7 +272,7 @@ contract Moloch {
 
         Proposal storage proposal = proposalQueue[proposalIndex];
         require(proposal.startingPeriod > 0, "Moloch::processProposal - proposal does not exist");
-        require(currentPeriod.sub(proposal.startingPeriod) > votingPeriodLength.add(gracePeriodLength), "Moloch::processProposal - proposal is not ready to be processed");
+        //require(currentPeriod.sub(proposal.startingPeriod) > votingPeriodLength.add(gracePeriodLength), "Moloch::processProposal - proposal is not ready to be processed");
         require(proposal.processed == false, "Moloch::processProposal - proposal has already been processed");
 
         proposal.processed = true;

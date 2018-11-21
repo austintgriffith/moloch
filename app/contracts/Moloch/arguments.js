@@ -10,7 +10,7 @@ let votingPeriodLength = 3 //default 7
 let gracePeriodLength = 3 //default 7
 let proposalDeposit = "1000000000000000000" //(1 ETH right now for testing) //default 5k in WEI
 module.exports = [
-  fs.readFileSync("contracts/GuildBank/GuildBank.address").toString().trim(),
+//  fs.readFileSync("contracts/GuildBank/GuildBank.address").toString().trim(),
   foundersAddresses,
   foundersVotingShares,
   periodDuration,

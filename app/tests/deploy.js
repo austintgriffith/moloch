@@ -1,7 +1,8 @@
 const clevis = require("./clevis.js")
 for(let c in clevis.contracts){
-  if(clevis.contracts[c]!="LootToken"){//don't deploy loot token, that is created by Moloch
+  //don't deploy loottoken or guildcoin, that is created by Moloch
+  if(clevis.contracts[c]!="LootToken"||clevis.contracts[c]!="GuildBank"){
     clevis.deploy(clevis.contracts[c],0)
   }
 }
-clevis.transferGuildBankOwnershipToMoloch(0)
+//clevis.transferGuildBankOwnershipToMoloch(0)
