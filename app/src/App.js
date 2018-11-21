@@ -42,6 +42,12 @@ class App extends Component {
       let memberInformation = await this.state.contracts.Moloch.members(this.state.account).call()
       let tokenApprovals = this.state.tokenApprovals
       let tokenBalances = this.state.tokenBalances
+      let lootTokenAddress = await this.state.contracts.Moloch.lootToken().call()
+      if(!this.state.lootTokenContract){
+        let lootTokenContract = this.state.customLoader("LootToken",lootTokenAddress)//new this.state.web3.eth.Contract(require("./contracts/BouncerProxy.abi.js"),this.state.address)
+        this.setState({lootTokenContract})
+      }
+
       if(this.state.applicant && this.state.tributeTokenAddresses){
         let tokenContracts = this.state.tokenContracts
         let tokenContractsChanged = false
@@ -81,6 +87,9 @@ class App extends Component {
           let member = this.state.addMemberEvents[e]
           let memberInformation = await this.state.contracts.Moloch.members(member.member).call()
           memberInformation.someCoinBalance = await this.state.contracts.SomeCoin.balanceOf(member.member).call()
+          if(this.state.lootTokenContract){
+            memberInformation.lootTokenBalance = await this.state.lootTokenContract.balanceOf(member.member).call()
+          }
           members[member.member] = memberInformation
         }
         this.setState({members})
@@ -123,6 +132,8 @@ class App extends Component {
              gracePeriodLength: await contracts.Moloch.gracePeriodLength().call(),
              periodDuration: await contracts.Moloch.periodDuration().call(),
              applicant: await contracts.Moloch.deployer().call(),
+             QUORUM_NUMERATOR: await contracts.Moloch.QUORUM_NUMERATOR().call(),
+             QUORUM_DENOMINATOR: await contracts.Moloch.QUORUM_DENOMINATOR().call(),
            },async ()=>{
              console.log("Contracts Are Ready:",this.state.contracts)
 
@@ -214,7 +225,7 @@ class App extends Component {
               </Button>
             )
             let voteColor = "blue"
-            if(this.state.currentPeriod>votingPeriodAt){
+            if(this.state.currentPeriod>=votingPeriodAt){
               voteColor = "red"
             }
             voteButtons = (
@@ -237,16 +248,23 @@ class App extends Component {
             )
           }
 
+          let currentProposalStatus = "No Quorum"
+
+          let votesNeeded = this.state.totalVotingShares * this.state.QUORUM_NUMERATOR / this.state.QUORUM_DENOMINATOR
+          let totalVotes = proposal.noVotes + proposal.yesVotes
+
+          if(totalVotes>=votesNeeded){
+            if(proposal.yesVotes > proposal.noVotes){
+              currentProposalStatus = "Passing"
+            }else{
+              currentProposalStatus = "Failing"
+            }
+          }
+
           proposals.push(
             <div key={p}>
               <span style={dividerSpan}>
                 {p}
-              </span>
-              <span style={dividerSpan}>
-                 <Blockie
-                  address={proposal.applicant}
-                  config={{size:3}}
-                 />
               </span>
               <span style={dividerSpan}>
                 <Blockie
@@ -254,18 +272,30 @@ class App extends Component {
                  config={{size:3}}
                 />
               </span>
+              :
+              (<span style={dividerSpan}>
+                 <Blockie
+                  address={proposal.applicant}
+                  config={{size:3}}
+                 />
+              </span>
+              <span style={dividerSpan}>
+                shares:{proposal.votingSharesRequested}
+              </span>)
+
+              <span style={dividerSpan}>
+                [{proposal.startingPeriod}/{votingPeriodAt}/{readyToProcessAt}]
+              </span>
+
               <span style={dividerSpan}>
                 no:{proposal.noVotes}
               </span>
               <span style={dividerSpan}>
                 yes:{proposal.yesVotes}
               </span>
-              <span style={dividerSpan}>
-                shares:{proposal.votingSharesRequested}
-              </span>
-              <span style={dividerSpan}>
-                startingPeriod:{proposal.startingPeriod}-({votingPeriodAt})-({readyToProcessAt})
-              </span>
+
+              ({currentProposalStatus})
+
               {voteButtons}
               {proposalButton}
             </div>
@@ -298,6 +328,27 @@ class App extends Component {
 
         for(let m in this.state.members){
           let member = this.state.members[m]
+
+          let memberControls = ""
+          if(m.toLowerCase()==this.state.account.toLowerCase()){
+            memberControls = (
+              <div>
+                RageQuit: <input
+                  style={{verticalAlign:"middle",width:400,margin:6,maxHeight:20,padding:5,border:'2px solid #ccc',borderRadius:5}}
+                  type="text" name="collectLootTokens" value={this.state.collectLootTokens} onChange={this.handleInput.bind(this)}
+                />
+                <Button color={"orange"} onClick={()=>{
+                    tx(contracts.Moloch.collectLootTokens(this.state.account,this.state.collectLootTokens),2000000,0,0,(receipt)=>{
+                      console.log("receipt",receipt)
+                      this.setState({collectLootTokens:""})
+                    })
+                  }}>
+                  collectLootTokens
+                </Button>
+              </div>
+            )
+          }
+
           members.push(
             <div key={m}>
               <div style={{marginTop:20}}>
@@ -305,8 +356,8 @@ class App extends Component {
                   {...this.state}
                   address={m}
                 />
-
               </div>
+              {memberControls}
               <div style={{borderBottom:"1px solid #555555"}}>
                 {" active:"}{member.isActive?"true":"false"}
                 {" votingShares:"}{member.votingShares}
@@ -317,7 +368,7 @@ class App extends Component {
                 ({member.someCoinBalance} <Blockie
                  address={contracts.SomeCoin._address}
                  config={{size:3}}
-                />Coins)
+                />Coins)({member.lootTokenBalance} Loot)
               </div>
             </div>
           )
@@ -343,7 +394,7 @@ class App extends Component {
               <Button color={updatePeriodColor} onClick={()=>{
                   console.log("periodStartedAt",periodStartedAt)
                   console.log("this.state.periodDuration",this.state.periodDuration)
-                  let gasNeeded = Math.round(20000 + 50000 * (parseInt(periodStartedAt)/parseInt(this.state.periodDuration)))
+                  let gasNeeded = Math.round(70000 + 50000 * (parseInt(periodStartedAt)/parseInt(this.state.periodDuration)))
                   console.log("gasNeeded",gasNeeded)
                   tx(contracts.Moloch.updatePeriod(),gasNeeded,0,0,(receipt)=>{
                     console.log("receipt",receipt)
