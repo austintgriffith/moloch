@@ -25,7 +25,7 @@ class App extends Component {
       doingTransaction: false,
       applicant:"0x9319Bbb4e2652411bE15BB74f339b7F6218b2508",
       tributeTokenAddresses:"loading...",
-      tributeTokenAmounts:"10,5",
+      tributeTokenAmounts:"1000,500",
       votingSharesRequested:"100",
       tokenApprovals: {},
       tokenBalances: {},
@@ -61,7 +61,7 @@ class App extends Component {
             votingPeriodLength: await molochContract.votingPeriodLength().call(),
             gracePeriodLength: await molochContract.gracePeriodLength().call(),
             periodDuration: await molochContract.periodDuration().call(),
-            applicant: await molochContract.deployer().call(),
+            applicant: this.state.account,
             QUORUM_NUMERATOR: await molochContract.QUORUM_NUMERATOR().call(),
             QUORUM_DENOMINATOR: await molochContract.QUORUM_DENOMINATOR().call(),
           },async ()=>{
@@ -291,7 +291,7 @@ class App extends Component {
                     this.state.web3.utils.toWei(this.state.deployproposalDeposit)
                   ]
                   console.log("ARGS",args)
-                  tx(contracts.Moloch._contract.deploy({data:code,arguments:args}),5200000,(receipt)=>{
+                  tx(contracts.Moloch._contract.deploy({data:code,arguments:args}),5500000,(receipt)=>{
                     console.log("~~~~~~ DEPLOY FROM DAPPARATUS:",receipt)
                     if(receipt.contractAddress){
                       console.log("CONTRACT DEPLOYED:",receipt.contractAddress)
@@ -402,6 +402,8 @@ class App extends Component {
               let voteColor = "blue"
               if(this.state.currentPeriod>=votingPeriodAt){
                 voteColor = "red"
+              }else if(this.state.currentPeriod<proposal.startingPeriod){
+                voteColor = "orange"
               }
               voteButtons = (
                 <span>
@@ -650,7 +652,10 @@ class App extends Component {
                   <Blockie
                     config={{size:3}}
                     address={guildBankTokenAddress}
-                  />{guildBankTokenBalance}
+                  /> {guildBankTokenBalance} (<Blockie
+                    config={{size:3}}
+                    address={guildBankTokenAddress}
+                  /> {Math.round(guildBankTokenBalance/this.state.totalVotingShares)} per share)
                 </div>
               )
             }

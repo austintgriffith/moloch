@@ -150,18 +150,18 @@ module.exports = {
         result = await clevis("sendTo","1.1","0","0xE68b423E49e13C704d2E403014a9C90d7961B98c")///<<<-------- change this to your metamask accounts
         printTxResult(result)
 
-        result = await clevis("contract","mint","SomeCoin","0","0x2a906694D15Df38F59e76ED3a5735f8AAbccE9cb",100)///<<<-------- change this to your metamask accounts
+        result = await clevis("contract","mint","SomeCoin","0","0x2a906694D15Df38F59e76ED3a5735f8AAbccE9cb",100000)///<<<-------- change this to your metamask accounts
         printTxResult(result)
-        result = await clevis("contract","mint","SomeCoin","0","0x9319bbb4e2652411be15bb74f339b7f6218b2508",100)///<<<-------- change this to your metamask accounts
+        result = await clevis("contract","mint","SomeCoin","0","0x9319bbb4e2652411be15bb74f339b7f6218b2508",100000)///<<<-------- change this to your metamask accounts
         printTxResult(result)
-        result = await clevis("contract","mint","SomeCoin","0","0xE68b423E49e13C704d2E403014a9C90d7961B98c",100)///<<<-------- change this to your metamask accounts
+        result = await clevis("contract","mint","SomeCoin","0","0xE68b423E49e13C704d2E403014a9C90d7961B98c",100000)///<<<-------- change this to your metamask accounts
         printTxResult(result)
 
-        result = await clevis("contract","mint","AnotherCoin","0","0x2a906694D15Df38F59e76ED3a5735f8AAbccE9cb",50)///<<<-------- change this to your metamask accounts
+        result = await clevis("contract","mint","AnotherCoin","0","0x2a906694D15Df38F59e76ED3a5735f8AAbccE9cb",50000)///<<<-------- change this to your metamask accounts
         printTxResult(result)
-        result = await clevis("contract","mint","AnotherCoin","0","0x9319bbb4e2652411be15bb74f339b7f6218b2508",50)///<<<-------- change this to your metamask accounts
+        result = await clevis("contract","mint","AnotherCoin","0","0x9319bbb4e2652411be15bb74f339b7f6218b2508",50000)///<<<-------- change this to your metamask accounts
         printTxResult(result)
-        result = await clevis("contract","mint","AnotherCoin","0","0xE68b423E49e13C704d2E403014a9C90d7961B98c",50)///<<<-------- change this to your metamask accounts
+        result = await clevis("contract","mint","AnotherCoin","0","0xE68b423E49e13C704d2E403014a9C90d7961B98c",50000)///<<<-------- change this to your metamask accounts
         printTxResult(result)
         //here is an example of running a funtion from within this object:
         //module.exports.mintTo("Greens",0,"0x2a906694d15df38f59e76ed3a5735f8aabcce9cb",20)

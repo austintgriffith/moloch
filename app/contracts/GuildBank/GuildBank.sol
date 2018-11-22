@@ -37,7 +37,7 @@ contract GuildBank is Ownable {
         address tokenAddress,
         uint256 tokenAmount
     ) public onlyOwner returns (bool) {
-        DepositTributeTokens(sender,tokenAddress,tokenAmount);
+        emit DepositTributeTokens(sender,tokenAddress,tokenAmount);
         if ((knownTokens[tokenAddress] == false) && (tokenAddress != address(lootToken))) {
             knownTokens[tokenAddress] = true;
             tokenAddresses.push(tokenAddress);
@@ -65,7 +65,7 @@ contract GuildBank is Ownable {
             require(token.transfer(receiver, tokenShare), "GuildBank::redeemLootTokens - token transfer failed");
         }
 
-        RedeemLootTokens(receiver,lootAmount);
+        emit RedeemLootTokens(receiver,lootAmount);
     }
 
 
@@ -94,6 +94,6 @@ contract GuildBank is Ownable {
             }
         }
 
-        RedeemLootTokens(receiver,lootAmount);
+        emit RedeemLootTokens(receiver,lootAmount);
     }
 }

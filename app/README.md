@@ -1,4 +1,25 @@
-Moloch React App
+# Moloch React App
+
+
+## Use Docker
+
+clone repo and spin up full environment with Docker:
+```
+docker run -ti --rm --name clevis -p 3000:3000 -p 8545:8545 -v ~/moloch/app:/dapp austingriffith/clevis:latest
+```
+(note: ~/moloch/app part needs to point to the app folder where you clone moloch)
+
+This will take a long time, but when it comes up:
+```
+clevis test full
+```
+
+visit:
+```
+http://localhost:3000/
+```
+
+## OR use Clevis Directly:
 
 clone down and run:
 ```
@@ -23,11 +44,6 @@ npm start
 visit:
 ```
 http://localhost:3000/
-```
-
-moloch deploy arguments are here:
-```
-contracts/Moloch/arguments.js
 ```
 
 if you need some testnet ETH in your metamask account, add it to the metamask() function in:

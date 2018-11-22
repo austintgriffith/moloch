@@ -96,10 +96,6 @@ contract Moloch {
     /********
     FUNCTIONS
     ********/
-
-    //AUSTIN COMMENT: THIS IS FOR EASE OF TESTING REMOVE WHEN READY
-    address public deployer;//used for simple debugging
-
     constructor(
         //address guildBankAddress,
         address[] foundersAddresses,
@@ -116,12 +112,12 @@ contract Moloch {
         // (It makes it a single transaction in the frontend to deploy a DAO)
         // it's also more consistant an requires less orchestration because the
         // owner is already set on deploy to the moloch
+        // (however, this does cost 5,200,000 so maybe a few tx is better)
+        // (if you do it in a few tx it is easier to charge up the guildbank too)
+        // (maybe we could even transferFrom in the constructor?)
         //guildBank = GuildBank(guildBankAddress);
         guildBank = new GuildBank();
         guildBank.setLootTokenAddress(lootToken);
-
-        //AUSTIN COMMENT: THIS IS FOR EASE OF TESTING REMOVE WHEN READY
-        deployer=msg.sender;
 
         periodDuration = _periodDuration;
         votingPeriodLength = _votingPeriodLength;
@@ -151,10 +147,10 @@ contract Moloch {
 
             // use the founder address as the delegateKey by default
             members[founder] = Member(founder, shares, true);
-            emit AddMember(founder);
             memberAddressByDelegateKey[founder] = founder;
             totalVotingShares = totalVotingShares.add(shares);
             lootToken.mint(this, shares);
+            emit AddMember(founder);
         }
     }
 
@@ -195,6 +191,7 @@ contract Moloch {
         // (stock it up at the start and it's deployed in the constructor now)
         // a good way to do this is to create a proposal with 0 voting shares requested
         // I'm going to take out this requirement for now and if that's dumb we can put it back in
+        // Is there some game theory reason not to allow 0 vote share proposals?
         //require(votingSharesRequested > 0, "Moloch::submitProposal - votingSharesRequested is zero");
 
         for (uint256 i = 0; i < tributeTokenAddresses.length; i++) {
@@ -222,19 +219,19 @@ contract Moloch {
             //mapping (address => Vote) votesByMember
         });
 
-        SubmitProposal(proposalQueue.push(proposal)-1,applicant,memberAddress);
+        emit SubmitProposal(proposalQueue.push(proposal)-1,applicant,memberAddress);
     }
 
     //AUSTIN COMMENT: I need some extra getters to make the frontend work right
     // I might be doing this wrong or there is a better way to access this data
     // just making it work for now:
-    function getProposalTokenAddress(uint256 proposalIndex, uint256 tokenIndex) external returns (address) {
+    function getProposalTokenAddress(uint256 proposalIndex, uint256 tokenIndex) external view returns (address) {
         return proposalQueue[proposalIndex].tributeTokenAddresses[tokenIndex];
     }
-    function getProposalTokenAmount(uint256 proposalIndex, uint256 tokenIndex) external returns (uint256) {
+    function getProposalTokenAmount(uint256 proposalIndex, uint256 tokenIndex) external view returns (uint256) {
         return proposalQueue[proposalIndex].tributeTokenAmounts[tokenIndex];
     }
-    function getProposalTokenLength(uint256 proposalIndex) external returns (uint256) {
+    function getProposalTokenLength(uint256 proposalIndex) external view returns (uint256) {
         return proposalQueue[proposalIndex].tributeTokenAddresses.length;
     }
 
@@ -246,9 +243,9 @@ contract Moloch {
 
         Proposal storage proposal = proposalQueue[proposalIndex];
         Vote vote = Vote(uintVote);
-        //require(proposal.startingPeriod > 0, "Moloch::submitVote - proposal does not exist");
-        //require(currentPeriod >= proposal.startingPeriod, "Moloch::submitVote - voting period has not started");
-        //require(currentPeriod.sub(proposal.startingPeriod) < votingPeriodLength, "Moloch::submitVote - proposal voting period has expired");
+        require(proposal.startingPeriod > 0, "Moloch::submitVote - proposal does not exist");
+        require(currentPeriod >= proposal.startingPeriod, "Moloch::submitVote - voting period has not started");
+        require(currentPeriod.sub(proposal.startingPeriod) < votingPeriodLength, "Moloch::submitVote - proposal voting period has expired");
         require(proposal.votesByMember[memberAddress] == Vote.Null, "Moloch::submitVote - member has already voted on this proposal");
         require(vote == Vote.Yes || vote == Vote.No, "Moloch::submitVote - vote must be either Yes or No");
         proposal.votesByMember[memberAddress] = vote;
@@ -256,8 +253,6 @@ contract Moloch {
         Member storage member = members[memberAddress];
         member.votesByProposal[proposalIndex] = vote;
 
-        //AUSTIN COMMENT: these weren't incrementing correctly so I updated it to
-        // change the values in storage
         if (vote == Vote.Yes) {
             proposal.yesVotes = proposal.yesVotes.add(member.votingShares);
         } else if (vote == Vote.No) {
@@ -272,7 +267,7 @@ contract Moloch {
 
         Proposal storage proposal = proposalQueue[proposalIndex];
         require(proposal.startingPeriod > 0, "Moloch::processProposal - proposal does not exist");
-        //require(currentPeriod.sub(proposal.startingPeriod) > votingPeriodLength.add(gracePeriodLength), "Moloch::processProposal - proposal is not ready to be processed");
+        require(currentPeriod.sub(proposal.startingPeriod) > votingPeriodLength.add(gracePeriodLength), "Moloch::processProposal - proposal is not ready to be processed");
         require(proposal.processed == false, "Moloch::processProposal - proposal has already been processed");
 
         proposal.processed = true;
@@ -294,7 +289,8 @@ contract Moloch {
                 }
 
                 // loop over their active proposal votes and add the new voting shares to any YES or NO votes
-                for (uint256 i = currentProposalIndex; i > oldestActiveProposal; i--) {
+                //AUSTIN COMMENT: I think this needs to be >= what if there is a single propsal
+                for (uint256 i = currentProposalIndex; i >= oldestActiveProposal; i--) {
                     if (isActiveProposal(i)) {
                         if(i!=proposalIndex) {//don't update the votes for the current propsal even if we already counted the votes (because it could possibly look wrong looking back at the count)
                           Proposal storage activeProposal = proposalQueue[i];
@@ -319,9 +315,9 @@ contract Moloch {
             } else {
                 // use applicant address as delegateKey by default
                 members[proposal.applicant] = Member(proposal.applicant, proposal.votingSharesRequested, true);
-                emit AddMember(proposal.applicant);
                 memberAddressByDelegateKey[proposal.applicant] = proposal.applicant;
                 result=Result.AddedNewMember;
+                emit AddMember(proposal.applicant);
             }
 
             // mint new voting shares and loot tokens
@@ -377,25 +373,15 @@ contract Moloch {
                 Proposal storage proposal = proposalQueue[i];
                 Vote vote = member.votesByProposal[i];
 
-                //AUSTIN COMMENT: this line is weird to me I think the logic or error message is wrong
-                // I'm going to comment it out and write this a little differently...
-                //require(vote != Vote.Yes, "Moloch::collectLoot - member voted YES on active proposal");
-                //I'm changing the logic here to just subtract their vote no matter what
-                //There is probably a reason why you don't want someone to rage quit with
-                // an active yes vote, but I don't see it yet. I'm probably wrong.
-                //I think they should be able to liquidate & revert their voting power
-                // in any situation even if they have active yes votes
+                require(vote != Vote.Yes, "Moloch::collectLoot - member voted YES on active proposal");
 
                 if (vote == Vote.Null) {
                     // member didn't vote on this proposal, skip to the next one
                     continue;
-                }else if (vote == Vote.No) {
-                    // member voted No, revert the vote.
-                    proposal.noVotes = proposal.noVotes.sub(lootAmount);
-                }else{
-                    // member voted Yes, revert the vote.
-                    proposal.yesVotes = proposal.yesVotes.sub(lootAmount);
                 }
+
+                // member voted No, revert the vote.
+                proposal.noVotes = proposal.noVotes.sub(lootAmount);
 
                 // if the member is collecting 100% of their loot, erase these vote completely
                 if (lootAmount == member.votingShares) {
@@ -420,8 +406,6 @@ contract Moloch {
 
     // returns true if proposal is either in voting or grace period
     function isActiveProposal(uint256 proposalIndex) internal view returns (bool) {
-        //AUSTIN COMMENT: needed to add in a check here. if the the proposalIndex==0 then this
-        // will revert when it tries to get the startingPeriod
         if(proposalQueue.length>proposalIndex){
             uint256 startingPeriod = proposalQueue[proposalIndex].startingPeriod;
             return (currentPeriod >= startingPeriod && currentPeriod.sub(startingPeriod) < votingPeriodLength.add(gracePeriodLength));
