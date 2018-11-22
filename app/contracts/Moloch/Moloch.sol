@@ -28,7 +28,7 @@ contract Moloch {
     event AddMember(address member);
     event SubmitProposal(uint256 index, address indexed applicant, address indexed memberAddress);
     event ProcessProposal(uint256 index, address indexed applicant, address indexed proposer, Result result);
-    event SubmitVote(address sender, address indexed memberAddress, uint256 proposalIndex, uint8 uintVote);
+    event SubmitVote(address sender, address indexed memberAddress, uint256 indexed proposalIndex, uint8 uintVote);
 
     /******************
     INTERNAL ACCOUNTING
@@ -348,7 +348,6 @@ contract Moloch {
     }
 
 
-    event CollectLootTokens(address treasury, uint256 lootAmount);
     function collectLootTokens(address treasury, uint256 lootAmount) public onlyMember {
         updatePeriod();
 
@@ -360,8 +359,6 @@ contract Moloch {
         totalVotingShares = totalVotingShares.sub(lootAmount);
 
         require(lootToken.transfer(treasury, lootAmount), "Moloch::collectLoot - loot token transfer failure");
-
-        emit CollectLootTokens(treasury,lootAmount);
 
         // loop over their active proposal votes:
         // - make sure they haven't voted YES on any active proposals
@@ -414,7 +411,7 @@ contract Moloch {
 
     function updateDelegateKey(address newDelegateKey) public onlyMember {
         // newDelegateKey must be either the member's address or one not in use by any other members
-        require(newDelegateKey == msg.sender || !members[memberAddressByDelegateKey[msg.sender]].isActive);
+        require(newDelegateKey == msg.sender || !members[memberAddressByDelegateKey[newDelegateKey]].isActive);
         Member storage member = members[msg.sender];
         memberAddressByDelegateKey[member.delegateKey] = address(0);
         memberAddressByDelegateKey[newDelegateKey] = msg.sender;

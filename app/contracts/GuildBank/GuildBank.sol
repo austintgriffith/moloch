@@ -16,6 +16,7 @@ contract GuildBank is Ownable {
     uint256 safeRedeemId = 0; // incremented on every safeRedeem attempt
 
     event DepositTributeTokens(address indexed sender, address tokenAddress, uint256 tokenAmount);
+    event RedeemLootTokens(address indexed receiver, uint256 lootAmount);
 
     //AUSTIN COMMENT: I don't know of any other way to get the array length to
     // avoid passing in an index that doesn't exist without making a custom getter
@@ -63,7 +64,10 @@ contract GuildBank is Ownable {
             uint256 tokenShare = token.balanceOf(this).mul(lootAmount).div(totalLootTokens);
             require(token.transfer(receiver, tokenShare), "GuildBank::redeemLootTokens - token transfer failed");
         }
+
+        RedeemLootTokens(receiver,lootAmount);
     }
+
 
 
     function safeRedeemLootTokens(
@@ -89,5 +93,7 @@ contract GuildBank is Ownable {
                 require(token.transfer(receiver, tokenShare), "GuildBank::redeemLootTokens - token transfer failed");
             }
         }
+
+        RedeemLootTokens(receiver,lootAmount);
     }
 }
