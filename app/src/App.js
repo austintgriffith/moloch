@@ -25,7 +25,7 @@ class App extends Component {
       doingTransaction: false,
       applicant:"0x9319Bbb4e2652411bE15BB74f339b7F6218b2508",
       tributeTokenAddresses:"loading...",
-      tributeTokenAmounts:"1000,500",
+      tributeTokenAmounts:"10000,500",
       votingSharesRequested:"100",
       tokenApprovals: {},
       tokenBalances: {},
@@ -655,7 +655,7 @@ class App extends Component {
                   /> {guildBankTokenBalance} (<Blockie
                     config={{size:3}}
                     address={guildBankTokenAddress}
-                  /> {Math.round(guildBankTokenBalance/this.state.totalVotingShares)} per share)
+                  /> {Math.floor(guildBankTokenBalance/this.state.totalVotingShares*10)/10} per share)
                 </div>
               )
             }
