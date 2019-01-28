@@ -1,3 +1,8 @@
+/* TODO
+ *
+ */
+
+
 pragma solidity 0.4.24;
 
 import "./oz/SafeMath.sol";
@@ -18,9 +23,6 @@ contract Moloch {
 
     GuildBank public guildBank; // guild bank contract reference
     LootToken public lootToken; // loot token contract reference
-
-    uint8 public constant QUORUM_NUMERATOR = 1;
-    uint8 public constant QUORUM_DENOMINATOR = 2;
 
     /***************
     EVENTS
@@ -274,7 +276,7 @@ contract Moloch {
 
         Result result = Result.Null;
 
-        if (proposal.yesVotes.add(proposal.noVotes) >= (totalVotingShares.mul(QUORUM_NUMERATOR)).div(QUORUM_DENOMINATOR) && proposal.yesVotes > proposal.noVotes) {
+        if (proposal.yesVotes > proposal.noVotes) {
 
             // if the proposer is the applicant, add to their existing voting shares
             if (proposal.proposer == proposal.applicant) {
