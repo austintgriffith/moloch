@@ -4,8 +4,13 @@
  * - result is 10% YES, 5% NO, so the vote passes
  * - We could address this by allowing users to still vote NO during the grace period (and only vote YES during voting period)
  * - but then basically people would only vote YES during voting, and NO during grace... think about this
+ *
+ * Test edge cases around increasing/decreasing voting shares of existing members wrt to proposal queue length
+ *
+ * Update the "result" event - talk to James first
+ * - processProposal uses it
+ * - could just add fields to processProposal event
  */
-
 
 pragma solidity 0.4.24;
 
@@ -191,7 +196,6 @@ contract Moloch {
             require(token.transferFrom(applicant, this, amount), "Moloch::submitProposal - tribute token transfer failed");
         }
 
-
         pendingProposals = pendingProposals.add(1);
         uint256 startingPeriod = currentPeriod + pendingProposals;
 
@@ -250,10 +254,11 @@ contract Moloch {
 
         Result result = Result.Null;
 
+        // PROPOSAL PASSED
         if (proposal.yesVotes > proposal.noVotes) {
 
-            // if the proposer is the applicant, add to their existing voting shares
-            if (proposal.proposer == proposal.applicant) {
+            // if the proposer is already a member, add to their existing voting shares
+            if (members[proposal.applicant].votingShares > 0) {
 
                 members[proposal.applicant].votingShares = members[proposal.applicant].votingShares.add(proposal.votingSharesRequested);
 
@@ -265,10 +270,11 @@ contract Moloch {
                 }
 
                 // loop over their active proposal votes and add the new voting shares to any YES or NO votes
-                //AUSTIN COMMENT: I think this needs to be >= what if there is a single propsal
                 for (uint256 i = currentProposalIndex; i >= oldestActiveProposal; i--) {
                     if (isActiveProposal(i)) {
-                        if(i!=proposalIndex) {//don't update the votes for the current propsal even if we already counted the votes (because it could possibly look wrong looking back at the count)
+                        // don't update the votes for the current propsal even if we already counted the votes (because it could possibly look wrong looking back at the count)
+                        // TODO why not?
+                        if (i != proposalIndex) {
                           Proposal storage activeProposal = proposalQueue[i];
                           Vote vote = activeProposal.votesByMember[proposal.applicant];
 
@@ -286,13 +292,14 @@ contract Moloch {
                         break;
                     }
                 }
-                result=Result.AddedVotingShares;
+                result = Result.AddedVotingShares;
+
             // the applicant is a new member, create a new record for them
             } else {
                 // use applicant address as delegateKey by default
                 members[proposal.applicant] = Member(proposal.applicant, proposal.votingSharesRequested, true);
                 memberAddressByDelegateKey[proposal.applicant] = proposal.applicant;
-                result=Result.AddedNewMember;
+                result = Result.AddedNewMember;
                 emit AddMember(proposal.applicant);
             }
 
@@ -306,13 +313,15 @@ contract Moloch {
               tributeToken.approve(address(guildBank),proposal.tributeTokenAmounts[j]);
               require(guildBank.depositTributeTokens(this, proposal.tributeTokenAddresses[j], proposal.tributeTokenAmounts[j]));
             }
+
+        // PROPOSAL FAILED
         } else {
             // return all tokens
             for (uint256 k; k < proposal.tributeTokenAddresses.length; k++) {
                 ERC20 token = ERC20(proposal.tributeTokenAddresses[k]);
                 require(token.transfer(proposal.applicant, proposal.tributeTokenAmounts[k]));
             }
-            result=Result.Failed;
+            result = Result.Failed;
         }
 
         proposal.proposer.transfer(proposalDeposit);
@@ -343,7 +352,8 @@ contract Moloch {
         if (currentProposalIndex >= votingPeriodLength+gracePeriodLength) {
             oldestActiveProposal = (currentProposalIndex.sub(votingPeriodLength)).sub(gracePeriodLength);
         }
-        //AUSTIN COMMENT: I think this needs to be >= what if there is a single propsal
+        // AUSTIN COMMENT: I think this needs to be >= what if there is a single propsal
+        // TODO verify
         for (uint256 i = currentProposalIndex; i >= oldestActiveProposal; i--) {
             if (isActiveProposal(i)) {
                 Proposal storage proposal = proposalQueue[i];

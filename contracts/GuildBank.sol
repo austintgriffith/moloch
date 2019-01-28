@@ -18,13 +18,6 @@ contract GuildBank is Ownable {
     event DepositTributeTokens(address indexed sender, address tokenAddress, uint256 tokenAmount);
     event RedeemLootTokens(address indexed receiver, uint256 lootAmount);
 
-    //AUSTIN COMMENT: I don't know of any other way to get the array length to
-    // avoid passing in an index that doesn't exist without making a custom getter
-    // I bet you guys know a better way but I'm new to all this
-    function getTokenAddressCount() external view returns (uint256) {
-        return tokenAddresses.length;
-    }
-
     function setLootTokenAddress(address lootTokenAddress) public onlyOwner returns (address) {
         require (address(lootTokenAddress) != address(0), "GuildBank::setLootTokenAddress address must not be zero");
         require (address(lootToken) == address(0),"GuildBank::setLootTokenAddress Loot Token address already set");
@@ -68,8 +61,6 @@ contract GuildBank is Ownable {
         emit RedeemLootTokens(receiver,lootAmount);
     }
 
-
-
     function safeRedeemLootTokens(
         address receiver,
         uint256 lootAmount,
@@ -95,5 +86,9 @@ contract GuildBank is Ownable {
         }
 
         emit RedeemLootTokens(receiver,lootAmount);
+    }
+
+    function getTokenAddressCount() external view returns (uint256) {
+        return tokenAddresses.length;
     }
 }
