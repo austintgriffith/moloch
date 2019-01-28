@@ -4,8 +4,6 @@
  * - result is 10% YES, 5% NO, so the vote passes
  * - We could address this by allowing users to still vote NO during the grace period (and only vote YES during voting period)
  * - but then basically people would only vote YES during voting, and NO during grace... think about this
- *
- * From Wolever - allow members to create proposals which reward other members
  */
 
 
