@@ -1,5 +1,11 @@
 /* TODO
+ * Known issue - if several members ragequit they could potentially shift a proposal from NO to YES
+ * - e.g. 10% YES, 15% NO, 75% Abstain -> 10% of the NO votes leave (could be ragequitting a separate proposal)
+ * - result is 10% YES, 5% NO, so the vote passes
+ * - We could address this by allowing users to still vote NO during the grace period (and only vote YES during voting period)
+ * - but then basically people would only vote YES during voting, and NO during grace... think about this
  *
+ * From Wolever - allow members to create proposals which reward other members
  */
 
 
@@ -178,7 +184,6 @@ contract Moloch {
 
         address memberAddress = memberAddressByDelegateKey[msg.sender];
 
-        require(memberAddress == applicant || !members[applicant].isActive, "Moloch::submitProposal - applicant is an active member besides the proposer");
         require(msg.value == proposalDeposit, "Moloch::submitProposal - insufficient proposalDeposit");
 
         for (uint256 i = 0; i < tributeTokenAddresses.length; i++) {
@@ -192,7 +197,6 @@ contract Moloch {
         pendingProposals = pendingProposals.add(1);
         uint256 startingPeriod = currentPeriod + pendingProposals;
 
-        //AUSTIN COMMENT: updated to a little nicer format IDK trash it if not
         Proposal memory proposal = Proposal({
             proposer: memberAddress,
             applicant: applicant,
@@ -203,24 +207,11 @@ contract Moloch {
             processed: false,
             tributeTokenAddresses: tributeTokenAddresses,
             tributeTokenAmounts: tributeTokenAmounts
-            //mapping (address => Vote) votesByMember
         });
 
-        emit SubmitProposal(proposalQueue.push(proposal)-1,applicant,memberAddress);
+        emit SubmitProposal(proposalQueue.push(proposal)-1, applicant,memberAddress);
     }
 
-    //AUSTIN COMMENT: I need some extra getters to make the frontend work right
-    // I might be doing this wrong or there is a better way to access this data
-    // just making it work for now:
-    function getProposalTokenAddress(uint256 proposalIndex, uint256 tokenIndex) external view returns (address) {
-        return proposalQueue[proposalIndex].tributeTokenAddresses[tokenIndex];
-    }
-    function getProposalTokenAmount(uint256 proposalIndex, uint256 tokenIndex) external view returns (uint256) {
-        return proposalQueue[proposalIndex].tributeTokenAmounts[tokenIndex];
-    }
-    function getProposalTokenLength(uint256 proposalIndex) external view returns (uint256) {
-        return proposalQueue[proposalIndex].tributeTokenAddresses.length;
-    }
 
 
     function submitVote(uint256 proposalIndex, uint8 uintVote) public onlyMemberDelegate {
@@ -347,11 +338,11 @@ contract Moloch {
         // - make sure they haven't voted YES on any active proposals
         // - update any active NO votes to reflect their new voting power.
         uint256 currentProposalIndex = 0;
-        if(proposalQueue.length > pendingProposals){
+        if (proposalQueue.length > pendingProposals) {
             currentProposalIndex = proposalQueue.length.sub(pendingProposals.add(1));
         }
         uint256 oldestActiveProposal = 0;
-        if(currentProposalIndex >= votingPeriodLength+gracePeriodLength){
+        if (currentProposalIndex >= votingPeriodLength+gracePeriodLength) {
             oldestActiveProposal = (currentProposalIndex.sub(votingPeriodLength)).sub(gracePeriodLength);
         }
         //AUSTIN COMMENT: I think this needs to be >= what if there is a single propsal
@@ -391,13 +382,29 @@ contract Moloch {
         member.delegateKey = newDelegateKey;
     }
 
+    /***************
+    GETTERS
+    ***************/
+
     // returns true if proposal is either in voting or grace period
     function isActiveProposal(uint256 proposalIndex) internal view returns (bool) {
-        if(proposalQueue.length>proposalIndex){
+        if (proposalQueue.length>proposalIndex) {
             uint256 startingPeriod = proposalQueue[proposalIndex].startingPeriod;
             return (currentPeriod >= startingPeriod && currentPeriod.sub(startingPeriod) < votingPeriodLength.add(gracePeriodLength));
-        }else{
+        } else {
             return false;
         }
+    }
+
+    function getProposalTokenAddress(uint256 proposalIndex, uint256 tokenIndex) external view returns (address) {
+        return proposalQueue[proposalIndex].tributeTokenAddresses[tokenIndex];
+    }
+
+    function getProposalTokenAmount(uint256 proposalIndex, uint256 tokenIndex) external view returns (uint256) {
+        return proposalQueue[proposalIndex].tributeTokenAmounts[tokenIndex];
+    }
+
+    function getProposalTokenLength(uint256 proposalIndex) external view returns (uint256) {
+        return proposalQueue[proposalIndex].tributeTokenAddresses.length;
     }
 }
