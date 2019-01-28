@@ -19,7 +19,7 @@ contract Moloch {
     uint256 public periodDuration; // default = 86400 = 1 day in seconds
     uint256 public votingPeriodLength; // default = 7 periods
     uint256 public gracePeriodLength; // default = 7 periods
-    uint256 public proposalDeposit; // default = $5,000 worth of ETH at contract deployment (units in Wei)
+    uint256 public proposalDeposit; // default = 10 ETH (~$1,000 worth of ETH at contract deployment)
 
     GuildBank public guildBank; // guild bank contract reference
     LootToken public lootToken; // loot token contract reference
@@ -99,7 +99,6 @@ contract Moloch {
     FUNCTIONS
     ********/
     constructor(
-        //address guildBankAddress,
         address[] foundersAddresses,
         uint256[] foundersVotingShares,
         uint256 _periodDuration,
@@ -110,14 +109,6 @@ contract Moloch {
         public
     {
         lootToken = new LootToken();
-        //AUSTIN COMMENT: It's easier to just deploy the guildbank from here too
-        // (It makes it a single transaction in the frontend to deploy a DAO)
-        // it's also more consistant an requires less orchestration because the
-        // owner is already set on deploy to the moloch
-        // (however, this does cost 5,200,000 so maybe a few tx is better)
-        // (if you do it in a few tx it is easier to charge up the guildbank too)
-        // (maybe we could even transferFrom in the constructor?)
-        //guildBank = GuildBank(guildBankAddress);
         guildBank = new GuildBank();
         guildBank.setLootTokenAddress(lootToken);
 
