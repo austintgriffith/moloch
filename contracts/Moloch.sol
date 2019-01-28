@@ -180,12 +180,6 @@ contract Moloch {
 
         require(memberAddress == applicant || !members[applicant].isActive, "Moloch::submitProposal - applicant is an active member besides the proposer");
         require(msg.value == proposalDeposit, "Moloch::submitProposal - insufficient proposalDeposit");
-        //AUSTIN COMMENT: I found a case where I wanted to add tokens to the guild bank
-        // (stock it up at the start and it's deployed in the constructor now)
-        // a good way to do this is to create a proposal with 0 voting shares requested
-        // I'm going to take out this requirement for now and if that's dumb we can put it back in
-        // Is there some game theory reason not to allow 0 vote share proposals?
-        //require(votingSharesRequested > 0, "Moloch::submitProposal - votingSharesRequested is zero");
 
         for (uint256 i = 0; i < tributeTokenAddresses.length; i++) {
             ERC20 token = ERC20(tributeTokenAddresses[i]);
