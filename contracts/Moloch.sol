@@ -17,7 +17,6 @@
  *  - remove ERC20 support, ETH maximalism
  *    - removes looping over ERC20 tokens on deposit and withdrawal
  *    - alternative, only ETH + DAI is allowed
- *  - single summoner
  *  - when people get more shares, their existing votes are not updated (no loop)
  *  - when people ragequit, their existing votes are not updated (no loop)
  *    - motivation -> yes vote may fail, but easier to do next time around
@@ -267,37 +266,6 @@ contract Moloch {
             if (members[proposal.applicant].votingShares > 0) {
 
                 members[proposal.applicant].votingShares = members[proposal.applicant].votingShares.add(proposal.votingSharesRequested);
-
-                uint256 currentProposalIndex = proposalQueue.length.sub(pendingProposals.add(1));
-
-                uint oldestActiveProposal = 0;
-                if (currentProposalIndex > votingPeriodLength.add(gracePeriodLength)) {
-                    oldestActiveProposal = currentProposalIndex.sub(votingPeriodLength).sub(gracePeriodLength);
-                }
-
-                // loop over their active proposal votes and add the new voting shares to any YES or NO votes
-                for (uint256 i = currentProposalIndex; i >= oldestActiveProposal; i--) {
-                    if (isActiveProposal(i)) {
-                        // don't update the votes for the current propsal even if we already counted the votes (because it could possibly look wrong looking back at the count)
-                        // TODO why not?
-                        if (i != proposalIndex) {
-                          Proposal storage activeProposal = proposalQueue[i];
-                          Vote vote = activeProposal.votesByMember[proposal.applicant];
-
-                          if (vote == Vote.Null) {
-                              // member didn't vote on this proposal, skip to the next one
-                              continue;
-                          } else if (vote == Vote.Yes) {
-                              activeProposal.yesVotes = activeProposal.yesVotes.add(proposal.votingSharesRequested);
-                          } else {
-                              activeProposal.noVotes = activeProposal.noVotes.add(proposal.votingSharesRequested);
-                          }
-                        }
-                    } else {
-                        // reached inactive proposal, exit the loop
-                        break;
-                    }
-                }
                 result = Result.AddedVotingShares;
 
             // the applicant is a new member, create a new record for them
