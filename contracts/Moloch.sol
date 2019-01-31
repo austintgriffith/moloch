@@ -79,8 +79,6 @@ contract Moloch {
     mapping (uint256 => Period) public periods;
     Proposal[] public proposalQueue;
 
-    bool isSummoned;
-
     /********
     MODIFIERS
     ********/
@@ -92,10 +90,6 @@ contract Moloch {
     modifier onlyMemberDelegate {
         require(members[memberAddressByDelegateKey[msg.sender]].votingShares > 0, "Moloch::onlyMemberDelegate - not a member");
         _;
-    }
-
-    modifier summoned {
-        require(isSummoned, "Moloch::summoningComplete - summoning is still in progress");
     }
 
     /********
@@ -154,7 +148,6 @@ contract Moloch {
         public
         payable
         onlyMemberDelegate
-        summoningComplete
     {
         updatePeriod();
 
@@ -193,7 +186,6 @@ contract Moloch {
     )
         public
         onlyMemberDelegate
-        summoningComplete
     {
         updatePeriod();
 
@@ -226,7 +218,7 @@ contract Moloch {
         emit SubmitVote(msg.sender, memberAddress, proposalIndex, uintVote);
     }
 
-    function processProposal(uint256 proposalIndex) public summoningComplete {
+    function processProposal(uint256 proposalIndex) public {
         updatePeriod();
 
         Proposal storage proposal = proposalQueue[proposalIndex];
@@ -283,7 +275,6 @@ contract Moloch {
     )
         public
         onlyMember
-        summoningComplete
     {
         updatePeriod();
 
@@ -299,7 +290,7 @@ contract Moloch {
         require(currentPeriod > member.canRagequitAfterBlock, "Moloch::collectLoot - can't ragequit yet");
     }
 
-    function updateDelegateKey(address newDelegateKey) public onlyMember summoned {
+    function updateDelegateKey(address newDelegateKey) public onlyMember {
         // newDelegateKey must be either the member's address or one not in use by any other members
         require(newDelegateKey == msg.sender || !members[memberAddressByDelegateKey[newDelegateKey]].isActive);
         Member storage member = members[msg.sender];
