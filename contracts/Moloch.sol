@@ -1,17 +1,5 @@
 /* TODO
- * Known issue - if several members ragequit they could potentially shift a proposal from NO to YES
- * - e.g. 10% YES, 15% NO, 75% Abstain -> 10% of the NO votes leave (could be ragequitting a separate proposal)
- * - result is 10% YES, 5% NO, so the vote passes
- * - We could address this by allowing users to still vote NO during the grace period (and only vote YES during voting period)
- * - but then basically people would only vote YES during voting, and NO during grace... think about this
- *
  * Test edge cases around increasing/decreasing voting shares of existing members wrt to proposal queue length
- *
- * Update the "result" event - talk to James first
- * - processProposal uses it
- * - could just add fields to processProposal event
- *
- * Remove "AddMembers" event - find another way to represent this
  *
  * New:
  *  - remove ERC20 support, ETH maximalism
@@ -43,10 +31,9 @@ contract Moloch {
     /***************
     EVENTS
     ***************/
-    event AddMember(address member);
-    event SubmitProposal(uint256 index, address indexed applicant, address indexed memberAddress);
-    event ProcessProposal(uint256 index, address indexed applicant, address indexed proposer, Result result);
-    event SubmitVote(address sender, address indexed memberAddress, uint256 indexed proposalIndex, uint8 uintVote);
+    event SubmitProposal(uint256 indexed index, address indexed applicant, address indexed memberAddress);
+    event ProcessProposal(uint256 indexed index, address indexed applicant, address indexed proposer, bool didPass, uint256 shares);
+    event SubmitVote(address indexed sender, address indexed memberAddress, uint256 indexed proposalIndex, uint8 uintVote);
 
     /******************
     INTERNAL ACCOUNTING
@@ -59,13 +46,6 @@ contract Moloch {
         Null, // default value, counted as abstention
         Yes,
         No
-    }
-
-    enum Result {
-        Null, // default value, counted as abstention
-        AddedVotingShares,
-        AddedNewMember,
-        Failed
     }
 
     struct Member {
@@ -256,24 +236,20 @@ contract Moloch {
 
         proposal.processed = true;
 
-        Result result = Result.Null;
+        bool didPass = proposal.yesVotes > proposal.noVotes;
 
         // PROPOSAL PASSED
-        if (proposal.yesVotes > proposal.noVotes) {
+        if (didPass) {
 
             // if the proposer is already a member, add to their existing voting shares
             if (members[proposal.applicant].votingShares > 0) {
 
                 members[proposal.applicant].votingShares = members[proposal.applicant].votingShares.add(proposal.votingSharesRequested);
-                result = Result.AddedVotingShares;
-
             // the applicant is a new member, create a new record for them
             } else {
                 // use applicant address as delegateKey by default
                 members[proposal.applicant] = Member(proposal.applicant, proposal.votingSharesRequested, true);
                 memberAddressByDelegateKey[proposal.applicant] = proposal.applicant;
-                result = Result.AddedNewMember;
-                emit AddMember(proposal.applicant);
             }
 
             // mint new voting shares and loot tokens
@@ -294,11 +270,10 @@ contract Moloch {
                 ERC20 token = ERC20(proposal.tributeTokenAddresses[k]);
                 require(token.transfer(proposal.applicant, proposal.tributeTokenAmounts[k]));
             }
-            result = Result.Failed;
         }
 
         proposal.proposer.transfer(proposalDeposit);
-        emit ProcessProposal(proposalIndex, proposal.applicant, proposal.proposer,result);
+        emit ProcessProposal(proposalIndex, proposal.applicant, proposal.proposer, didPass, proposal.votingSharesRequested);
     }
 
 
