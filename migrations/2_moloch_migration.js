@@ -4,14 +4,13 @@ const fse = require('fs-extra')
 const Moloch = artifacts.require('./Moloch.sol')
 const LootToken = artifacts.require('./LootToken.sol')
 const GuildBank = artifacts.require('./GuildBank.sol')
-const FooToken = artifacts.require('./oz/StandardToken.sol')
-const BarToken = artifacts.require('./oz/StandardToken.sol')
 
 const foundersJSON = require('./founders.json')
 const configJSON = require('./config.json')
 
 module.exports = (deployer, network, accounts) => {
   deployer.then(async () => {
+    lootToken = await deployer.deploy(GuildBank)
     guildBank = await deployer.deploy(GuildBank)
     moloch = await deployer.deploy(
       Moloch,
@@ -24,8 +23,7 @@ module.exports = (deployer, network, accounts) => {
       configJSON.MIN_PROPOSAL_DEPOSIT_IN_WEI,
       { gas: 6000000 }
     )
-    lootTokenAddress = await moloch.lootToken()
-    await guildBank.setLootTokenAddress(lootTokenAddress)
-    await guildBank.transferOwnership(moloch.address)
+    // await guildBank.setLootTokenAddress(lootTokens)
+    //await guildBank.transferOwnership(moloch.address)
   })
 }

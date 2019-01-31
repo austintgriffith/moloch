@@ -10,6 +10,20 @@
  * Update the "result" event - talk to James first
  * - processProposal uses it
  * - could just add fields to processProposal event
+ *
+ * Remove "AddMembers" event - find another way to represent this
+ *
+ * New:
+ *  - remove ERC20 support, ETH maximalism
+ *    - removes looping over ERC20 tokens on deposit and withdrawal
+ *    - alternative, only ETH + DAI is allowed
+ *  - single summoner
+ *  - when people get more shares, their existing votes are not updated (no loop)
+ *  - when people ragequit, their existing votes are not updated (no loop)
+ *    - motivation -> yes vote may fail, but easier to do next time around
+ *    - also solves problem of failing votes passing because No votes ragequit
+ *  - when people vote, store the period # they can exit (avoid loop)
+ *
  */
 
 pragma solidity 0.4.24;
@@ -91,6 +105,8 @@ contract Moloch {
     mapping (uint256 => Period) public periods;
     Proposal[] public proposalQueue;
 
+    bool isSummoned;
+
     /********
     MODIFIERS
     ********/
@@ -104,23 +120,26 @@ contract Moloch {
         _;
     }
 
+    modifier summoned {
+        require(isSummoned, "Moloch::summoningComplete - summoning is still in progress");
+    }
+
     /********
     FUNCTIONS
     ********/
     constructor(
-        address[] foundersAddresses,
-        uint256[] foundersVotingShares,
+        address lootTokenAddress,
+        address guildBankAddress,
         uint256 _periodDuration,
         uint256 _votingPeriodLength,
         uint256 _gracePeriodLength,
-        uint _proposalDeposit
+        uint _proposalDeposit,
+        address summoner
     )
         public
     {
-        lootToken = new LootToken();
-        guildBank = new GuildBank();
-        guildBank.setLootTokenAddress(lootToken);
-
+        lootToken = LootToken(lootTokenAddress);
+        guildBank = GuildBank(guildBankAddress);
         periodDuration = _periodDuration;
         votingPeriodLength = _votingPeriodLength;
         gracePeriodLength = _gracePeriodLength;
@@ -130,30 +149,9 @@ contract Moloch {
         periods[currentPeriod].startTime = startTime;
         periods[currentPeriod].endTime = startTime.add(periodDuration);
 
-        _addFoundingMembers(foundersAddresses, foundersVotingShares);
-    }
-
-    function _addFoundingMembers(
-        address[] membersArray,
-        uint256[] sharesArray
-    )
-        internal
-    {
-        require(membersArray.length == sharesArray.length, "Moloch::_addFoundingMembers - Provided arrays should match up.");
-        for (uint i = 0; i < membersArray.length; i++) {
-            address founder = membersArray[i];
-            uint256 shares = sharesArray[i];
-
-            require(shares > 0, "Moloch::_addFoundingMembers - founding member has 0 shares");
-            require(!members[founder].isActive, "Moloch::_addFoundingMembers - duplicate founder");
-
-            // use the founder address as the delegateKey by default
-            members[founder] = Member(founder, shares, true);
-            memberAddressByDelegateKey[founder] = founder;
-            totalVotingShares = totalVotingShares.add(shares);
-            lootToken.mint(this, shares);
-            emit AddMember(founder);
-        }
+        members[summoner] = Member(summoner, 1, true);
+        totalVotingShares = totalVotingShares.add(1);
+        lootToken.mint(this, 1);
     }
 
     function updatePeriod() public {
@@ -182,6 +180,7 @@ contract Moloch {
         public
         payable
         onlyMemberDelegate
+        summoningComplete
     {
         updatePeriod();
 
@@ -216,7 +215,14 @@ contract Moloch {
 
 
 
-    function submitVote(uint256 proposalIndex, uint8 uintVote) public onlyMemberDelegate {
+    function submitVote(
+        uint256 proposalIndex,
+        uint8 uintVote
+    )
+        public
+        onlyMemberDelegate
+        summoningComplete
+    {
         updatePeriod();
 
         address memberAddress = memberAddressByDelegateKey[msg.sender];
@@ -242,7 +248,7 @@ contract Moloch {
         emit SubmitVote(msg.sender, memberAddress, proposalIndex, uintVote);
     }
 
-    function processProposal(uint256 proposalIndex) public {
+    function processProposal(uint256 proposalIndex) public summoningComplete {
         updatePeriod();
 
         Proposal storage proposal = proposalQueue[proposalIndex];
@@ -329,7 +335,14 @@ contract Moloch {
     }
 
 
-    function collectLootTokens(address treasury, uint256 lootAmount) public onlyMember {
+    function collectLootTokens(
+        address treasury,
+        uint256 lootAmount
+    )
+        public
+        onlyMember
+        summoningComplete
+    {
         updatePeriod();
 
         Member storage member = members[msg.sender];
@@ -381,7 +394,7 @@ contract Moloch {
         }
     }
 
-    function updateDelegateKey(address newDelegateKey) public onlyMember {
+    function updateDelegateKey(address newDelegateKey) public onlyMember summoned {
         // newDelegateKey must be either the member's address or one not in use by any other members
         require(newDelegateKey == msg.sender || !members[memberAddressByDelegateKey[newDelegateKey]].isActive);
         Member storage member = members[msg.sender];

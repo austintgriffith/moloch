@@ -3,7 +3,6 @@
 
 const Moloch = artifacts.require('./Moloch')
 const GuildBank = artifacts.require('./GuildBank')
-// const TestCoin = artifacts.require('./TestCoin')
 const LootToken = artifacts.require('./LootToken')
 const foundersJSON = require('../migrations/founders.json')
 const configJSON = require('../migrations/config.json')
