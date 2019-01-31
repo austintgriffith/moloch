@@ -17,8 +17,6 @@
  *  - remove ERC20 support, ETH maximalism
  *    - removes looping over ERC20 tokens on deposit and withdrawal
  *    - alternative, only ETH + DAI is allowed
- *  - when people vote, store the period # they can exit (avoid loop)
- *
  */
 
 pragma solidity 0.4.24;
@@ -75,6 +73,7 @@ contract Moloch {
         uint256 votingShares; // the # of voting shares assigned to this member
         bool isActive; // always true once a member has been created
         mapping (uint256 => Vote) votesByProposal; // records a member's votes by the index of the proposal
+        uint256 canRagequitAfterBlock; // block # after which member can ragequit - set on vote
     }
 
     struct Proposal {
@@ -208,8 +207,6 @@ contract Moloch {
         emit SubmitProposal(proposalQueue.push(proposal)-1, applicant,memberAddress);
     }
 
-
-
     function submitVote(
         uint256 proposalIndex,
         uint8 uintVote
@@ -238,6 +235,12 @@ contract Moloch {
             proposal.yesVotes = proposal.yesVotes.add(member.votingShares);
         } else if (vote == Vote.No) {
             proposal.noVotes = proposal.noVotes.add(member.votingShares);
+        }
+
+        uint256 endingPeriod = proposal.startingPeriod.add(votingPeriodLength).add(gracePeriodLength);
+
+        if (endingPeriod > member.canRagequitAfterBlock) {
+            member.canRagequitAfterBlock = endingPeriod;
         }
 
         emit SubmitVote(msg.sender, memberAddress, proposalIndex, uintVote);
@@ -318,7 +321,7 @@ contract Moloch {
 
         require(lootToken.transfer(treasury, lootAmount), "Moloch::collectLoot - loot token transfer failure");
 
-        // TODO prevent ragequitting if user has voted yes on active proposals
+        require(currentPeriod > member.canRagequitAfterBlock, "Moloch::collectLoot - can't ragequit yet");
     }
 
     function updateDelegateKey(address newDelegateKey) public onlyMember summoned {
