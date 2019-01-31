@@ -17,10 +17,6 @@
  *  - remove ERC20 support, ETH maximalism
  *    - removes looping over ERC20 tokens on deposit and withdrawal
  *    - alternative, only ETH + DAI is allowed
- *  - when people get more shares, their existing votes are not updated (no loop)
- *  - when people ragequit, their existing votes are not updated (no loop)
- *    - motivation -> yes vote may fail, but easier to do next time around
- *    - also solves problem of failing votes passing because No votes ragequit
  *  - when people vote, store the period # they can exit (avoid loop)
  *
  */
@@ -322,44 +318,7 @@ contract Moloch {
 
         require(lootToken.transfer(treasury, lootAmount), "Moloch::collectLoot - loot token transfer failure");
 
-        // loop over their active proposal votes:
-        // - make sure they haven't voted YES on any active proposals
-        // - update any active NO votes to reflect their new voting power.
-        uint256 currentProposalIndex = 0;
-        if (proposalQueue.length > pendingProposals) {
-            currentProposalIndex = proposalQueue.length.sub(pendingProposals.add(1));
-        }
-        uint256 oldestActiveProposal = 0;
-        if (currentProposalIndex >= votingPeriodLength+gracePeriodLength) {
-            oldestActiveProposal = (currentProposalIndex.sub(votingPeriodLength)).sub(gracePeriodLength);
-        }
-        // AUSTIN COMMENT: I think this needs to be >= what if there is a single propsal
-        // TODO verify
-        for (uint256 i = currentProposalIndex; i >= oldestActiveProposal; i--) {
-            if (isActiveProposal(i)) {
-                Proposal storage proposal = proposalQueue[i];
-                Vote vote = member.votesByProposal[i];
-
-                require(vote != Vote.Yes, "Moloch::collectLoot - member voted YES on active proposal");
-
-                if (vote == Vote.Null) {
-                    // member didn't vote on this proposal, skip to the next one
-                    continue;
-                }
-
-                // member voted No, revert the vote.
-                proposal.noVotes = proposal.noVotes.sub(lootAmount);
-
-                // if the member is collecting 100% of their loot, erase these vote completely
-                if (lootAmount == member.votingShares) {
-                    proposal.votesByMember[msg.sender] = Vote.Null;
-                    member.votesByProposal[i] = Vote.Null;
-                }
-            } else {
-                // reached inactive proposal, exit the loop
-                break;
-            }
-        }
+        // TODO prevent ragequitting if user has voted yes on active proposals
     }
 
     function updateDelegateKey(address newDelegateKey) public onlyMember summoned {
